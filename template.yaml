@@ -2,12 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Amazon Lex with Lambda validation, DynamoDB storage, CloudWatch logs, and S3 archiving
 
 Resources:
-   # --- Amazon Lex Bot ---
+  # --- Amazon Lex Bot ---
   LexChatBot:
     Type: AWS::Lex::Bot
     Properties:
-      Name: SupportBot
-      Description: "Customer support chatbot"
+      Name: BurgerBuddyBot
+      Description: "A bot that supports customers buying burgers"
       RoleArn: !GetAtt LexExecutionRole.Arn
       DataPrivacy:
         ChildDirected: false
@@ -15,18 +15,92 @@ Resources:
       BotLocales:
         - LocaleId: en_US
           NluConfidenceThreshold: 0.4
+          SlotTypes:
+            - Name: BurgerType
+              Description: "Types of burgers"
+              SlotTypeValues:
+                - SampleValue: { Value: "cheeseburger" }
+                - SampleValue: { Value: "veggie" }
+                - SampleValue: { Value: "jalapino" }
+              ValueSelectionSetting:  # <-- REQUIRED FOR LEX V2
+                ResolutionStrategy: ORIGINAL_VALUE  # or "TOP_RESOLUTION"
+            - Name: BurgerSize
+              Description: "Burger sizes"
+              SlotTypeValues:
+                - SampleValue: { Value: "small" }
+                - SampleValue: { Value: "medium" }
+                - SampleValue: { Value: "large" }
+              ValueSelectionSetting:  # <-- REQUIRED FOR LEX V2
+                ResolutionStrategy: ORIGINAL_VALUE  # or "TOP_RESOLUTION"
+            - Name: BurgerFranchise
+              Description: "Burger franchise"
+              SlotTypeValues:
+                - SampleValue: { Value: "BurgerKing" }
+                - SampleValue: { Value: "McDonald" }
+                - SampleValue: { Value: "JollyBee" }
+              ValueSelectionSetting:  # <-- REQUIRED FOR LEX V2
+                ResolutionStrategy: ORIGINAL_VALUE  # or "TOP_RESOLUTION"
           Intents:
-            - Name: GeneralSupport
-              Description: "Handle general queries"
+            - Name: OrderBurger
+              Description: "Handle Burger Orders"
               SampleUtterances:
-                - Utterance: "I need help"
-                - Utterance: "Can you assist me?"
+                - Utterance: "I'd like to order a {BurgerType}"
+                - Utterance: "I'd like to order a {BurgerSize} {BurgerType}"
+                - Utterance: "I'd like to order a {BurgerSize} {BurgerType} from {BurgerFranchise}"
+              Slots:
+                - Name: BurgerType
+                  SlotTypeName: BurgerType
+                  Description: "Type of burger being ordered"
+                  ValueElicitationSetting:
+                    PromptSpecification:
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "What type of burger would you like? We have cheeseburger, veggie, or bacon."
+                      MaxRetries: 2
+                    SlotConstraint: Required
+
+                - Name: BurgerSize
+                  SlotTypeName: BurgerSize
+                  Description: "Size of burger being ordered"
+                  ValueElicitationSetting:
+                    PromptSpecification:
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "What size? We have small, medium, or large."
+                      MaxRetries: 2
+                    SlotConstraint: Required
+
+                - Name: BurgerFranchise
+                  SlotTypeName: BurgerFranchise
+                  Description: "Franchise for the order"
+                  ValueElicitationSetting:
+                    PromptSpecification:
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which franchise should we order from? McDonald's, Burger King, or Wendy's?"
+                      MaxRetries: 2
+                    SlotConstraint: Required
               FulfillmentCodeHook:
                 Enabled: true
-              OutputContexts: []
+                PostFulfillmentStatusSpecification:
+                  SuccessResponse:
+                    MessageGroupsList:
+                      - Message:
+                          PlainTextMessage:
+                            Value: "Your {BurgerSize} {BurgerType} from {BurgerFranchise} has been ordered! Anything else?"
+                  TimeoutResponse:
+                    MessageGroupsList:
+                      - Message:
+                          PlainTextMessage:
+                            Value: "Still working on your order..."
+
             - Name: FallbackIntent
               Description: "Handles unrecognized inputs"
               ParentIntentSignature: "AMAZON.FallbackIntent"
+
   LexExecutionRole:
     Type: AWS::IAM::Role
     Properties:
