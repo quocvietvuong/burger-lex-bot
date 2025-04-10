@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Amazon Lex with Lambda validation, DynamoDB storage, CloudWatch logs, and S3 archiving
+
+Resources:
+   # --- Amazon Lex Bot ---
+  LexChatBot:
+    Type: AWS::Lex::Bot
+    Properties:
+      Name: SupportBot
+      Description: "Customer support chatbot"
+      RoleArn: !GetAtt LexExecutionRole.Arn
+      DataPrivacy:
+        ChildDirected: false
+      IdleSessionTTLInSeconds: 300
+      BotLocales:
+        - LocaleId: en_US
+          NluConfidenceThreshold: 0.4
+          Intents:
+            - Name: GeneralSupport
+              Description: "Handle general queries"
+              SampleUtterances:
+                - Utterance: "I need help"
+                - Utterance: "Can you assist me?"
+              FulfillmentCodeHook:
+                Enabled: true
+              OutputContexts: []
+            - Name: FallbackIntent
+              Description: "Handles unrecognized inputs"
+              ParentIntentSignature: "AMAZON.FallbackIntent"
+  LexExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lexv2.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: LexPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ['lambda:InvokeFunction']
+                Resource: !GetAtt LexValidatorLambda.Arn
+
+  LexValidatorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LexValidator
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          from datetime import datetime
+          
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('ConversationLogs')
+          
+          def lambda_handler(event, context):
+              # Validate and persist to DynamoDB
+              table.put_item(Item={
+                  'ConversationID': event['sessionId'],
+                  'UserInput': event['inputTranscript'],
+                  'Timestamp': datetime.now().isoformat(),
+                  'ExpiryTime': int(datetime.now().timestamp()) + 86400  # TTL: 1 day
+              })
+              
+              # Log to CloudWatch
+              print(json.dumps({
+                  "sessionId": event['sessionId'],
+                  "input": event['inputTranscript'],
+                  "status": "Processed"
+              }))
+              
+              return {
+                  "dialogAction": {
+                      "type": "Close",
+                      "fulfillmentState": "Fulfilled",
+                      "message": {
+                          "contentType": "PlainText",
+                          "content": "Your request has been recorded!"
+                      }
+                  }
+              }
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConversationLogsTable
+
+    # --- DynamoDB Table for Conversation Logs ---
+  ConversationLogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ConversationLogs
+      AttributeDefinitions:
+        - AttributeName: ConversationID
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ConversationID
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        AttributeName: ExpiryTime
+        Enabled: true
+  
+    # --- IAM Roles ---
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: LambdaPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - s3:PutObject
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
