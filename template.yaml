@@ -1,8 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Amazon Lex with Lambda validation, DynamoDB storage, CloudWatch logs, and S3 archiving
-
 Resources:
-  # --- Amazon Lex Bot ---
+# --- Amazon Lex Bot ---
   LexChatBot:
     Type: AWS::Lex::Bot
     Properties:
@@ -19,31 +18,36 @@ Resources:
             - Name: BurgerType
               Description: "Types of burgers"
               SlotTypeValues:
-                - SampleValue: { Value: "cheeseburger" }
-                - SampleValue: { Value: "veggie" }
-                - SampleValue: { Value: "jalapino" }
-              ValueSelectionSetting:  # <-- REQUIRED FOR LEX V2
+                - SampleValue: { Value: "bacon" }
+                - SampleValue: { Value: "cheese" }
+                - SampleValue: { Value: "chilli" }
+                - SampleValue: { Value: "fried egg" }
+                - SampleValue: { Value: "fried green tomatoes" }
+                - SampleValue: { Value: "fried pickle" }
+                - SampleValue: { Value: "jalapeno" }
+              ValueSelectionSetting: # <-- REQUIRED FOR LEX V2
                 ResolutionStrategy: ORIGINAL_VALUE  # or "TOP_RESOLUTION"
             - Name: BurgerSize
               Description: "Burger sizes"
               SlotTypeValues:
-                - SampleValue: { Value: "small" }
-                - SampleValue: { Value: "medium" }
-                - SampleValue: { Value: "large" }
+                - SampleValue: { Value: "single" }
+                - SampleValue: { Value: "double" }
+                - SampleValue: { Value: "triple" }
               ValueSelectionSetting:  # <-- REQUIRED FOR LEX V2
                 ResolutionStrategy: ORIGINAL_VALUE  # or "TOP_RESOLUTION"
             - Name: BurgerFranchise
               Description: "Burger franchise"
               SlotTypeValues:
-                - SampleValue: { Value: "BurgerKing" }
-                - SampleValue: { Value: "McDonald" }
-                - SampleValue: { Value: "JollyBee" }
+                - SampleValue: { Value: "Best Burger" }
+                - SampleValue: { Value: "Burger Palace" }
+                - SampleValue: { Value: "Flaming Burger" }
               ValueSelectionSetting:  # <-- REQUIRED FOR LEX V2
                 ResolutionStrategy: ORIGINAL_VALUE  # or "TOP_RESOLUTION"
           Intents:
             - Name: OrderBurger
               Description: "Handle Burger Orders"
               SampleUtterances:
+                - Utterance: "I'd like to order a burger"
                 - Utterance: "I'd like to order a {BurgerType}"
                 - Utterance: "I'd like to order a {BurgerSize} {BurgerType}"
                 - Utterance: "I'd like to order a {BurgerSize} {BurgerType} from {BurgerFranchise}"
@@ -56,10 +60,9 @@ Resources:
                       MessageGroupsList:
                         - Message:
                             PlainTextMessage:
-                              Value: "What type of burger would you like? We have cheeseburger, veggie, or bacon."
+                              Value: "What type of burger would you like? (ex: cheese, fried egg or jalapeno)?"
                       MaxRetries: 2
                     SlotConstraint: Required
-
                 - Name: BurgerSize
                   SlotTypeName: BurgerSize
                   Description: "Size of burger being ordered"
@@ -68,10 +71,9 @@ Resources:
                       MessageGroupsList:
                         - Message:
                             PlainTextMessage:
-                              Value: "What size? We have small, medium, or large."
+                              Value: "What size burger would you like (single, double or triple patty)?"
                       MaxRetries: 2
                     SlotConstraint: Required
-
                 - Name: BurgerFranchise
                   SlotTypeName: BurgerFranchise
                   Description: "Franchise for the order"
@@ -80,27 +82,43 @@ Resources:
                       MessageGroupsList:
                         - Message:
                             PlainTextMessage:
-                              Value: "Which franchise should we order from? McDonald's, Burger King, or Wendy's?"
+                              Value: "Where would you like to order from (Best Burger, Burger Palace, Flaming Burger)?"
                       MaxRetries: 2
                     SlotConstraint: Required
+              # confirmation prompt
+              IntentConfirmationSetting:
+                PromptSpecification:
+                  MaxRetries: 2
+                  MessageGroupsList:
+                    - Message:
+                        PlainTextMessage:
+                          Value: "Would you like me to order your {BurgerSize} {BurgerType} from {BurgerFranchise}?"
+                DeclinationResponse:
+                  MessageGroupsList:
+                    - Message:
+                        PlainTextMessage:
+                          Value: "Stay hungry, my friend."
               FulfillmentCodeHook:
-                Enabled: true
+                Enabled: false
                 PostFulfillmentStatusSpecification:
                   SuccessResponse:
                     MessageGroupsList:
                       - Message:
                           PlainTextMessage:
-                            Value: "Your {BurgerSize} {BurgerType} from {BurgerFranchise} has been ordered! Anything else?"
+                            Value: "I've ordered your {BurgerSize} {BurgerType} from {BurgerFranchise}."
+                  FailureResponse:
+                    MessageGroupsList:
+                      - Message:
+                          PlainTextMessage:
+                            Value: "Oops. Something went wrong. Please try again."
                   TimeoutResponse:
                     MessageGroupsList:
                       - Message:
                           PlainTextMessage:
                             Value: "Still working on your order..."
-
             - Name: FallbackIntent
               Description: "Handles unrecognized inputs"
               ParentIntentSignature: "AMAZON.FallbackIntent"
-
   LexExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -119,7 +137,6 @@ Resources:
               - Effect: Allow
                 Action: ['lambda:InvokeFunction']
                 Resource: !GetAtt LexValidatorLambda.Arn
-
   LexValidatorLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -132,26 +149,24 @@ Resources:
           import json
           import boto3
           from datetime import datetime
-          
+
           dynamodb = boto3.resource('dynamodb')
           table = dynamodb.Table('ConversationLogs')
-          
+
           def lambda_handler(event, context):
               # Validate and persist to DynamoDB
               table.put_item(Item={
                   'ConversationID': event['sessionId'],
                   'UserInput': event['inputTranscript'],
                   'Timestamp': datetime.now().isoformat(),
-                  'ExpiryTime': int(datetime.now().timestamp()) + 86400  # TTL: 1 day
+                  'ExpiryTime': int(datetime.now().timestamp()) + 86400  # TTL: 1 day
               })
-              
               # Log to CloudWatch
               print(json.dumps({
                   "sessionId": event['sessionId'],
                   "input": event['inputTranscript'],
                   "status": "Processed"
               }))
-              
               return {
                   "dialogAction": {
                       "type": "Close",
@@ -165,8 +180,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref ConversationLogsTable
-
-    # --- DynamoDB Table for Conversation Logs ---
+  # --- DynamoDB Table for Conversation Logs ---
   ConversationLogsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -185,8 +199,7 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: ExpiryTime
         Enabled: true
-  
-    # --- IAM Roles ---
+  # --- IAM Roles ---
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
