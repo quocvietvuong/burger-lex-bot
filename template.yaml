@@ -99,7 +99,9 @@ Resources:
                         PlainTextMessage:
                           Value: "Stay hungry, my friend."
               FulfillmentCodeHook:
-                Enabled: false
+                Enabled: true
+                LambdaFunctionArn: !GetAtt LexValidatorLambda.Arn
+                EnableCodeHook: true
                 PostFulfillmentStatusSpecification:
                   SuccessResponse:
                     MessageGroupsList:
@@ -154,28 +156,18 @@ Resources:
           table = dynamodb.Table('ConversationLogs')
 
           def lambda_handler(event, context):
-              # Validate and persist to DynamoDB
-              table.put_item(Item={
-                  'ConversationID': event['sessionId'],
-                  'UserInput': event['inputTranscript'],
-                  'Timestamp': datetime.now().isoformat(),
-                  'ExpiryTime': int(datetime.now().timestamp()) + 86400  # TTL: 1 day
-              })
-              # Log to CloudWatch
-              print(json.dumps({
-                  "sessionId": event['sessionId'],
-                  "input": event['inputTranscript'],
-                  "status": "Processed"
-              }))
+              print("event: {}", event)
+              bot = event['bot']['name']
+              slots = event['sessionState']['intent']['slots']
+              intent = event['sessionState']['intent']['name']
+
+              print(bot)
+              print(slots)
+              print(intent)
+
               return {
-                  "dialogAction": {
-                      "type": "Close",
-                      "fulfillmentState": "Fulfilled",
-                      "message": {
-                          "contentType": "PlainText",
-                          "content": "Your request has been recorded!"
-                      }
-                  }
+                  'statusCode': 200,
+                  'body': json.dumps('Hello from Lambda!')
               }
       Environment:
         Variables:
