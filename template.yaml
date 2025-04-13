@@ -46,6 +46,8 @@ Resources:
           Intents:
             - Name: OrderBurger
               Description: "Handle Burger Orders"
+              DialogCodeHook:
+                Enabled: true
               SampleUtterances:
                 - Utterance: "I'd like to order a burger"
                 - Utterance: "I'd like to order a {BurgerType}"
@@ -100,8 +102,7 @@ Resources:
                           Value: "Stay hungry, my friend."
               FulfillmentCodeHook:
                 Enabled: true
-                LambdaFunctionArn: !GetAtt LexValidatorLambda.Arn
-                EnableCodeHook: true
+                IsActive: true
                 PostFulfillmentStatusSpecification:
                   SuccessResponse:
                     MessageGroupsList:
@@ -156,7 +157,8 @@ Resources:
           table = dynamodb.Table('ConversationLogs')
 
           def lambda_handler(event, context):
-              print("event: {}", event)
+              print(event)
+
               bot = event['bot']['name']
               slots = event['sessionState']['intent']['slots']
               intent = event['sessionState']['intent']['name']
