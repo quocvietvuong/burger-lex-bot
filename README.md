@@ -14,6 +14,7 @@ zip -r order_burger_bot_validate_lambda.zip .
 
 4. push the lambda_handler to s3 bucket
 
+aws s3 rm s3://[Lambda-Lex-Validator-Bucket-Name]/order_burger_bot_validate_lambda.zip
 aws s3 cp order_burger_bot_validate_lambda.zip s3://[Lambda-Lex-Validator-Bucket-Name]/order_burger_bot_validate_lambda.zip
 
 5. Deploy CloudFormation

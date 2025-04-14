@@ -1,10 +1,15 @@
 import json
+import boto3
+from datetime import datetime
 
 burger_sizes = ['single', 'double', 'triple']
 burger_franchises = ['best burger', 'burger palace', 'flaming burger']
 best_burger_types = ['plain', 'cheese', 'bacon']
 burger_palace_types = ['fried egg', 'fried pickle', 'fried green tomatoes']
 flaming_burger_types = ['chili', 'jalapeno', 'peppercorn']
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('ConversationLogsTable')
 
 
 def validate_order(slots):
@@ -95,6 +100,16 @@ def lambda_handler(event, context):
     slots = event['sessionState']['intent']['slots']
     intent = event['sessionState']['intent']['name']
 
+    user_input = event['inputTranscript']
+
+    # save to DynamoDB
+    table.put_item(Item = {
+        'ConversationID': event['sessionId'],
+        'UserInput': user_input,
+        'Timestamp': datetime.now().isoformat()
+    })
+    
+
     order_validation_result = validate_order(slots)
 
     if event['invocationSource'] == 'DialogCodeHook':
@@ -164,6 +179,11 @@ def lambda_handler(event, context):
                 }
             ]
         }
-
+    table.put_item(Item = {
+        'ConversationID': event['sessionId'],
+        'UserInput': user_input,
+        'Response': response,
+        'Timestamp': datetime.now().isoformat()
+    })
     print(response)
     return response
