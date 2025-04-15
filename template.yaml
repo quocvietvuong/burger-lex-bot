@@ -153,6 +153,39 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref ConversationLogsTable
+  CloudWatchLogSaverLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CloudWatchLogSaver
+      Runtime: python3.9
+      Handler: lambda_handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: validate-lambda-code-orderburgerbot-bucket
+        S3Key: order_burger_bot_cloudwatch_log_save_lambda.zip
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref LogBucket
+  # S3 bucket for saving log
+  LogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: orderburgerbot-cloudwatch-log-saver-bucket
+  LogSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: !GetAtt CloudWatchLogSaverLambda.Arn
+      FilterPattern: ""
+      LogGroupName: "/aws/lambda/LexValidator"
+
+  # Permission for CloudWatch Logs to invoke Lambda
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CloudWatchLogSaverLambda
+      Principal: "logs.amazonaws.com"
+      SourceArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/LexValidator:*"
   # --- DynamoDB Table for Conversation Logs ---
   ConversationLogsTable:
     Type: AWS::DynamoDB::Table
@@ -191,6 +224,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:PutItem
+                  - dynamodb:UpdateItem
                   - s3:PutObject
                   - logs:CreateLogGroup
                   - logs:CreateLogStream

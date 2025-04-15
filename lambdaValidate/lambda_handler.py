@@ -9,7 +9,7 @@ burger_palace_types = ['fried egg', 'fried pickle', 'fried green tomatoes']
 flaming_burger_types = ['chili', 'jalapeno', 'peppercorn']
 
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('ConversationLogsTable')
+table = dynamodb.Table('ConversationLogs')
 
 
 def validate_order(slots):
@@ -102,14 +102,6 @@ def lambda_handler(event, context):
 
     user_input = event['inputTranscript']
 
-    # save to DynamoDB
-    table.put_item(Item = {
-        'ConversationID': event['sessionId'],
-        'UserInput': user_input,
-        'Timestamp': datetime.now().isoformat()
-    })
-    
-
     order_validation_result = validate_order(slots)
 
     if event['invocationSource'] == 'DialogCodeHook':
@@ -179,11 +171,25 @@ def lambda_handler(event, context):
                 }
             ]
         }
-    table.put_item(Item = {
-        'ConversationID': event['sessionId'],
-        'UserInput': user_input,
-        'Response': response,
-        'Timestamp': datetime.now().isoformat()
-    })
-    print(response)
+    new_message = {
+        'Input': user_input,
+        'Response': response
+    }
+    try:
+        tablePutItemResponse = table.update_item(
+            Key = {
+                'ConversationID': event['sessionId'],
+                'Timestamp': datetime.now().isoformat()
+            },
+            UpdateExpression = "SET Messages = list_append(if_not_exists(Messages, :empty_list), :new_message)",
+            ExpressionAttributeValues = {
+                ':new_message': [new_message],  # Wrap in a list to append
+                ':empty_list': []  # initialize with an empty list if Messages does not exist
+            },
+            ReturnValues = "UPDATED_NEW"
+        )
+        print("Item updated successfully:", tablePutItemResponse)
+        print("Response: ", response)
+    except Exception as e:
+        print("Error updating item: ", e)
     return response
