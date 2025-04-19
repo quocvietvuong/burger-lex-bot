@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Amazon Lex with Lambda validation, DynamoDB storage, CloudWatch logs, and S3 archiving
 Resources:
 # --- Amazon Lex Bot ---
-  LexChatBot:
+  OrderBurgerBot:
     Type: AWS::Lex::Bot
     Properties:
       Name: BurgerBuddyBot
@@ -148,36 +148,95 @@ Resources:
         # ContactflowLogs: not required
         # ContactLens:  not required
         # EarlyMedia: not required
-        InboundCalls: yes
-        OutboundCalls: yes
+        InboundCalls: true
+        OutboundCalls: false
         # UseCustomTTSVoices: not required
         # DirectoryId:  not required
       IdentityManagementType: SAML
       InstanceAlias: MyFirstTest94853
       # Tags: not required
-  MyConnectIntegrationAssociation:
+  MyConnectIntegrationAssociationWithLex:
     Type: AWS::Connect::IntegrationAssociation
     Properties:
-      InstanceId: # arn of the instance
-      IntegrationArn: # arn of the integration
+      InstanceId: !Ref MyConnectInstance # arn of the instance
+      IntegrationArn: !GetAtt OrderBurgerBot.Arn # arn of the integration
       IntegrationType: LEX_BOT # LEX_BOT | LAMBDA_FUNCTION | APPLICATION
   MyConnectQueue:
     Type: AWS::Connect::Queue
     Properties:
-      Description: # not required
+      Description: "Queue for Lex bot interactions" # not required
       HoursOfOperationArn:
-      InstanceArn:
-      MaxContacts: # not required
-      Name:
+      InstanceArn: !GetAtt MyConnectInstance.Arn
+      # MaxContacts: # not required
+      Name: "LexBotQueue"
       OutboundCallerConfig: # not required
-        OutboundCallerIdName: # not required
-        OutboundCallerIdNumberArn: # not required
-        OutboundFlowArn: # not required
-      OutboundEmailConfig: # not required
-        OutboundEmailAddressId: # not required
-      QuickConnectArns: # The arn of the of the quick connects available to agents who are working the queue - not required
-      Status: # not required
-      Tags: # not required
+        OutboundCallerIdName: "LexBot" # not required
+        OutboundCallerIdNumberArn: "+1123456890" # not required
+        # OutboundFlowArn: # not required
+      # OutboundEmailConfig: # not required
+        # OutboundEmailAddressId: # not required
+      # QuickConnectArns: # The arn of the of the quick connects available to agents who are working the queue - not required
+      # Status: # not required
+      # Tags: # not required
+  ConnectHoursOfOperation:
+    Type: AWS::Connect::HoursOfOperation
+    Properties:
+      Config:
+        - Day: MONDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: TUESDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: WEDNESDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: THURSDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: FRIDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: SATURDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: SUNDAY
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+      Description: "Always Available"
+      # HoursOfOperationOverrides: notrequired
+      InstanceArn: !Ref MyConnectInstance
+      Name: "24/7 Support"
+      # Tags: notrequired
+      TimeZone: SGT
   MyConnectRoutingProfile:
     Type: AWS::Connect::RoutingProfile
     Properties:
