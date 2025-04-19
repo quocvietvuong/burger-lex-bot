@@ -140,6 +140,21 @@ Resources:
               - Effect: Allow
                 Action: ['lambda:InvokeFunction']
                 Resource: !GetAtt LexValidatorLambda.Arn
+  MyConnectInstance:
+    Type: AWS::Connect::Instance
+    Properties:
+      Attributes:
+        # AutoResolveBestVoices:  not required
+        # ContactflowLogs: not required
+        # ContactLens:  not required
+        # EarlyMedia: not required
+        InboundCalls: yes
+        OutboundCalls: yes
+        # UseCustomTTSVoices: not required
+        # DirectoryId:  not required
+      IdentityManagementType: SAML
+      InstanceAlias: MyFirstTest94853
+      # Tags: not required
   LexValidatorLambda:
     Type: AWS::Lambda::Function
     Properties:
