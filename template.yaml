@@ -155,6 +155,56 @@ Resources:
       IdentityManagementType: SAML
       InstanceAlias: MyFirstTest94853
       # Tags: not required
+  MyConnectIntegrationAssociation:
+    Type: AWS::Connect::IntegrationAssociation
+    Properties:
+      InstanceId: # arn of the instance
+      IntegrationArn: # arn of the integration
+      IntegrationType: LEX_BOT # LEX_BOT | LAMBDA_FUNCTION | APPLICATION
+  MyConnectQueue:
+    Type: AWS::Connect::Queue
+    Properties:
+      Description: # not required
+      HoursOfOperationArn:
+      InstanceArn:
+      MaxContacts: # not required
+      Name:
+      OutboundCallerConfig: # not required
+        OutboundCallerIdName: # not required
+        OutboundCallerIdNumberArn: # not required
+        OutboundFlowArn: # not required
+      OutboundEmailConfig: # not required
+        OutboundEmailAddressId: # not required
+      QuickConnectArns: # The arn of the of the quick connects available to agents who are working the queue - not required
+      Status: # not required
+      Tags: # not required
+  MyConnectRoutingProfile:
+    Type: AWS::Connect::RoutingProfile
+    Properties:
+      AgentAvailabilityTimer: # not required
+      DefaultOutboundQueueArn:
+      Description:
+      InstanceArn:
+      MediaConcurrencies:
+        - Channel:
+          Concurrency:
+          CrossChannelBehavior: # not required
+            BehaviorType: # ROUTE_CURRENT_CHANNEL_ONLY | ROUTE_ANY_CHANNEL
+      Name:
+      QueueConfigs: # not required
+      Tags: # not required
+  MyConnectContactFlow:
+    Type: AWS::Connect::ContactFlow
+    Properties:
+      Content: String
+      Description: StringNotRequired
+      InstanceArn: String
+      Name: String
+      State: StringNotRequired
+      Tags: # not required
+        - Tag
+      Type: String # CONTACT_FLOW | CUSTOMER_QUEUE | CUSTOMER_HOLD | CUSTOMER_WHISPER | AGENT_HOLD | AGENT_WHISPER | OUTBOUND_WHISPER |
+                   # AGENT_TRANSFER | QUEUE_TRANSFER | CAMPAIGN
   LexValidatorLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -167,7 +217,7 @@ Resources:
         S3Key: order_burger_bot_validate_lambda.zip
       Environment:
         Variables:
-          TABLE_NAME: !Ref ConversationLogsTable
+          TABLE_NAME: !Ref ConversationLogsTable # retrieves the physical ID (arn)
   CloudWatchLogSaverLambda:
     Type: AWS::Lambda::Function
     Properties:
