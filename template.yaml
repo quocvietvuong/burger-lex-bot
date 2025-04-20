@@ -122,6 +122,11 @@ Resources:
             - Name: FallbackIntent
               Description: "Handles unrecognized inputs"
               ParentIntentSignature: "AMAZON.FallbackIntent"
+  OrderBurgerBotAlias:
+    Type: AWS::Lex::BotAlias
+    Properties:
+      BotAliasName: "PROD"
+      BotId: !Ref OrderBurgerBot
   LexExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -152,8 +157,8 @@ Resources:
         OutboundCalls: false
         # UseCustomTTSVoices: not required
         # DirectoryId:  not required
-      IdentityManagementType: SAML
-      InstanceAlias: MyFirstTest94853
+      IdentityManagementType: CONNECT_MANAGED
+      InstanceAlias: "this-is3423-o2354n-2356fgdme"
       # Tags: not required
   MyConnectIntegrationAssociationWithLex:
     Type: AWS::Connect::IntegrationAssociation
@@ -165,13 +170,13 @@ Resources:
     Type: AWS::Connect::Queue
     Properties:
       Description: "Queue for Lex bot interactions" # not required
-      HoursOfOperationArn:
+      HoursOfOperationArn: !GetAtt ConnectHoursOfOperation.Arn
       InstanceArn: !GetAtt MyConnectInstance.Arn
       # MaxContacts: # not required
       Name: "LexBotQueue"
-      OutboundCallerConfig: # not required
-        OutboundCallerIdName: "LexBot" # not required
-        OutboundCallerIdNumberArn: "+1123456890" # not required
+      # OutboundCallerConfig: # not required
+        # OutboundCallerIdName: "LexBot" # not required
+        # OutboundCallerIdNumberArn: "+1123456890" # not required
         # OutboundFlowArn: # not required
       # OutboundEmailConfig: # not required
         # OutboundEmailAddressId: # not required
@@ -236,34 +241,60 @@ Resources:
       InstanceArn: !Ref MyConnectInstance
       Name: "24/7 Support"
       # Tags: notrequired
-      TimeZone: SGT
+      TimeZone: "Asia/Singapore"
   MyConnectRoutingProfile:
     Type: AWS::Connect::RoutingProfile
     Properties:
-      AgentAvailabilityTimer: # not required
-      DefaultOutboundQueueArn:
-      Description:
-      InstanceArn:
+      # AgentAvailabilityTimer: # not required
+      DefaultOutboundQueueArn: !GetAtt MyConnectQueue.Arn
+      Description: "Route calls to Lex Bot"
+      InstanceArn: !GetAtt MyConnectInstance.Arn
       MediaConcurrencies:
-        - Channel:
-          Concurrency:
-          CrossChannelBehavior: # not required
-            BehaviorType: # ROUTE_CURRENT_CHANNEL_ONLY | ROUTE_ANY_CHANNEL
-      Name:
-      QueueConfigs: # not required
-      Tags: # not required
+        - Channel: "VOICE"
+          Concurrency: 10
+          # CrossChannelBehavior: # not required
+            # BehaviorType: # ROUTE_CURRENT_CHANNEL_ONLY | ROUTE_ANY_CHANNEL
+      Name: "Lex Bot Routing"
+      # QueueConfigs: # not required
+      # Tags: # not required
   MyConnectContactFlow:
     Type: AWS::Connect::ContactFlow
     Properties:
-      Content: String
-      Description: StringNotRequired
-      InstanceArn: String
-      Name: String
-      State: StringNotRequired
-      Tags: # not required
-        - Tag
-      Type: String # CONTACT_FLOW | CUSTOMER_QUEUE | CUSTOMER_HOLD | CUSTOMER_WHISPER | AGENT_HOLD | AGENT_WHISPER | OUTBOUND_WHISPER |
+      # Description: StringNotRequired
+      InstanceArn: !GetAtt MyConnectInstance.Arn
+      Name: "LexBotFlow"
+      # State: StringNotRequired
+      # Tags: # not required
+        # - Tag
+      Type: CONTACT_FLOW # CONTACT_FLOW | CUSTOMER_QUEUE | CUSTOMER_HOLD | CUSTOMER_WHISPER | AGENT_HOLD | AGENT_WHISPER | OUTBOUND_WHISPER |
                    # AGENT_TRANSFER | QUEUE_TRANSFER | CAMPAIGN
+      Content: |
+        {
+          "Version": "2019-10-30",
+          "StartAction": "41d3f5b5-9a3a-4a7b-8b3a-6b9a3a4a7b8b",
+          "Actions": [
+            {
+              "Identifier": "41d3f5b5-9a3a-4a7b-8b3a-6b9a3a4a7b8b",
+              "Type": "InvokeLexBot",
+              "Parameters": {
+                "BotAliasArn": !Sub "arn:aws:lex:${AWS::Region}:${AWS::AccountId}:bot-alias/${OrderBurgerBot}/${OrderBurgerBotAlias}",
+                "BotName": !Ref OrderBurgerBot,
+                "Text": "Hello, how can I help you today?"
+              },
+              "Transitions": {
+                "NextAction": "ab392daa-1b2c-4d3e-8f4a-9b8c7d6e5f4a",
+                "Errors": [],
+                "Conditions": []
+              }
+            },
+            {
+              "Identifier": "ab392daa-1b2c-4d3e-8f4a-9b8c7d6e5f4a",
+              "Type": "Disconnect",
+              "Parameters": {},
+              "Transitions": {}
+            }
+          ]
+        }
   LexValidatorLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -297,6 +328,7 @@ Resources:
       BucketName: orderburgerbot-cloudwatch-log-saver-bucket
   LogSubscriptionFilter:
     Type: AWS::Logs::SubscriptionFilter
+    DependsOn: LambdaInvokePermission # Explicit Dependency
     Properties:
       DestinationArn: !GetAtt CloudWatchLogSaverLambda.Arn
       FilterPattern: ""
@@ -307,7 +339,7 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref CloudWatchLogSaverLambda
+      FunctionName: !GetAtt CloudWatchLogSaverLambda.Arn
       Principal: "logs.amazonaws.com"
       SourceArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/LexValidator:*"
   # --- DynamoDB Table for Conversation Logs ---
